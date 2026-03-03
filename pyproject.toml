@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ma-simpso"
+version = "1.0.0"
+description = "Simpsons character classification using CNN on PyTorch"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "OhButWhy", email = "" },
+]
+license = { text = "MIT" }
+keywords = ["machine-learning", "deep-learning", "pytorch", "cnn", "classification"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "numpy>=1.20",
+    "pillow>=8.0",
+    "matplotlib>=3.5",
+    "scikit-learn>=1.0",
+    "tqdm>=4.60",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0",
+    "flake8>=6.0",
+    "isort>=5.12",
+    "pre-commit>=3.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/OhButWhy/Ma_Simpso"
+Repository = "https://github.com/OhButWhy/Ma_Simpso.git"
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pylint]
+max-line-length = 88

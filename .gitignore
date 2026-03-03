@@ -1,0 +1,45 @@
+# Датасеты (большие файлы)
+src/dataset/
+src/kaggle_simpson_testset/
+
+# Результаты обучения (генерируются автоматически)
+src/results/
+
+# Модели (веса)
+src/models/*.pt
+*.h5
+*.pth
+*.onnx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Environment variables
+.env
+.env.local
