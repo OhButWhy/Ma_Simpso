@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import torch
 import torch.nn as nn
 
@@ -8,7 +6,8 @@ class SimpleCNN(nn.Module):
     """Сверточная нейронная сеть для классификации персонажей.
 
     Архитектура:
-    - 3 блока свертки (Conv -> ReLU -> MaxPool)
+    - 2 блока свертки (Conv -> BatchNorm -> ReLU -> MaxPool)
+    - Дополнительный MaxPool для сохранения spatial-scale
     - Полносвязные слои с Dropout
     - Выходной слой для классификации
     """
@@ -16,25 +15,25 @@ class SimpleCNN(nn.Module):
     def __init__(self, num_classes: int, input_size: int = 128):
         super().__init__()
 
-        # Блок 1: 3 -> 32 канала
+        # Блок 1: 3 -> 64 канала
         self.conv1 = nn.Conv2d(
             in_channels=3,      # RGB изображение
-            out_channels=32,    # 32 фильтра
+            out_channels=64,    # 64 фильтра
             kernel_size=3,      # размер фильтра 3x3
             padding=1           # padding чтобы размер не менялся
         )
+        self.bn1 = nn.BatchNorm2d(64)
         self.relu1 = nn.ReLU()
         # MaxPool уменьшает размер изображения в 2 раза
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # Блок 2: 32 -> 64 канала
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        # Блок 2: 64 -> 128 каналов
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(128)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # Блок 3: 64 -> 128 каналов
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.relu3 = nn.ReLU()
+        # Третий MaxPool без дополнительной свертки
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Вычисляем размер после сверток
@@ -58,14 +57,15 @@ class SimpleCNN(nn.Module):
             логиты для каждого класса [batch_size, num_classes]
         """
         # Сверточные блоки
-        x = self.pool1(self.relu1(self.conv1(x)))
-        x = self.pool2(self.relu2(self.conv2(x)))
-        x = self.pool3(self.relu3(self.conv3(x)))
+        x = self.pool1(self.relu1(self.bn1(self.conv1(x))))
+        x = self.pool2(self.relu2(self.bn2(self.conv2(x))))
+        x = self.pool3(x)
 
         # Полносвязные слои
         x = self.flatten(x)
         x = self.relu4(self.fc1(x))
         x = self.dropout(x)
+        x = self.dropout2(x)
         x = self.fc2(x)
 
         return x

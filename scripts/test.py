@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -107,6 +108,34 @@ def save_confusion_matrix_text(
         file.write("\n")
 
 
+def save_test_results(
+    accuracy: float,
+    class_report: str,
+    output_dir: Path,
+) -> tuple[Path, Path]:
+    """Сохраняет ключевые результаты тестового прогона."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    metrics_path = output_dir / "test_metrics.json"
+    report_path = output_dir / "classification_report.txt"
+
+    with metrics_path.open("w", encoding="utf-8") as file:
+        json.dump(
+            {
+                "accuracy": accuracy,
+                "accuracy_percent": accuracy * 100,
+            },
+            file,
+            indent=2,
+            ensure_ascii=False,
+        )
+
+    with report_path.open("w", encoding="utf-8") as file:
+        file.write(class_report)
+
+    return metrics_path, report_path
+
+
 def main():
     # Фиксируем random seed
     set_seed(config.RANDOM_SEED)
@@ -189,7 +218,14 @@ def main():
         class_names=class_names,
         output_path=confusion_matrix_path,
     )
+    metrics_path, report_path = save_test_results(
+        accuracy=acc,
+        class_report=results["class_report"],
+        output_dir=results_dir,
+    )
     print(f"\nПолная матрица ошибок сохранена: {confusion_matrix_path}")
+    print(f"Метрики теста сохранены: {metrics_path}")
+    print(f"Classification report сохранён: {report_path}")
 
     print("\n" + "=" * 60)
 

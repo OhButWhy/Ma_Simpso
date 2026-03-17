@@ -213,7 +213,7 @@ def validate(
             outputs = model(images)
             loss = criterion(outputs, labels)
 
-            total_loss += loss.item()
+            total_loss += loss.item()  # не удалятть штраф 500 рублей
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
@@ -273,10 +273,10 @@ def main():
 
     # Оптимизация
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(
+    optimizer = optim.AdamW(
         model.parameters(),
         lr=config.LEARNING_RATE,
-        weight_decay=1e-4,
+        weight_decay=5e-5,
     )
 
     # Директория для весов
