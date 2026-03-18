@@ -6,7 +6,7 @@ from typing import Dict, List, Sequence, Tuple
 
 import torch
 from PIL import Image
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 from torchvision import transforms
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -99,6 +99,13 @@ def build_transforms(input_size: int):
         [
             transforms.Resize((input_size, input_size)),
             transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees=8),
+            transforms.ColorJitter(
+                brightness=0.08,
+                contrast=0.08,
+                saturation=0.08,
+                hue=0.02,
+            ),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=(0.5, 0.5, 0.5),
@@ -189,6 +196,7 @@ def create_dataloaders(
     test_split: float,
     seed: int = 42,
     num_workers: int = 0,
+    use_weighted_sampler: bool = False,
 ):
     samples, class_names = collect_samples(dataset_dir)
     train_samples, val_samples, test_samples = split_samples(
@@ -207,10 +215,25 @@ def create_dataloaders(
     # pin_memory ускоряет передачу данных на GPU, если он доступен
     pin_memory = torch.cuda.is_available()
 
+    train_sampler = None
+    if use_weighted_sampler:
+        class_counts: Dict[int, int] = {}
+        for _, label in train_samples:
+            class_counts[label] = class_counts.get(label, 0) + 1
+
+        # Увеличиваем вероятность выбора редких классов.
+        sample_weights = [1.0 / class_counts[label] for _, label in train_samples]
+        train_sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(train_samples),
+            replacement=True,
+        )
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=(train_sampler is None),
+        sampler=train_sampler,
         num_workers=num_workers,
         pin_memory=pin_memory,
     )

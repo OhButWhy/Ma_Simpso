@@ -1,22 +1,21 @@
 """
-Скрипт обучения модели классификации персонажей Симпсонов.
+Скрипт для продолжения обучения уже обученной модели.
 
-Использует:
-- config.py для параметров
-- data_utils.py для загрузки датасета
-- model.py для архитектуры
+Загружает сохранённые веса и конфигурацию, продолжает обучение
+на заданное количество дополнительных эпох.
+
+Использование:
+    python scripts/continue_train.py --epochs 5
+    python scripts/continue_train.py --epochs 10 --lr 0.0003
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import json
 import sys
-from datetime import datetime
 from pathlib import Path
 
-# Добавляем корень проекта в path для импорта src как пакета
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -30,9 +29,25 @@ from src import (
     config,
     create_dataloaders,
     create_model,
-    get_config_dict,
     set_seed,
 )  # noqa: E402
+
+
+def load_history_csv(history_path: Path) -> list[dict]:
+    """Загружает историю обучения из CSV."""
+    history = []
+    if history_path.exists():
+        with history_path.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                history.append({
+                    "epoch": int(row["epoch"]),
+                    "train_loss": float(row["train_loss"]),
+                    "train_acc": float(row["train_acc"]),
+                    "val_loss": float(row["val_loss"]),
+                    "val_acc": float(row["val_acc"]),
+                })
+    return history
 
 
 def save_history_csv(
@@ -89,41 +104,6 @@ def plot_history(
     return loss_plot_path, acc_plot_path
 
 
-def save_config(
-    output_path: Path,
-    extra_info: dict | None = None,
-) -> None:
-    """Сохраняет конфигурацию запуска в JSON.
-
-    Args:
-        output_path: Путь для сохранения JSON файла
-        extra_info: Дополнительная информация (опционально)
-    """
-    # Безопасное получение версии CUDA
-    cuda_version = None
-    if torch.cuda.is_available():
-        try:
-            cuda_version = torch.version.cuda  # type: ignore
-        except AttributeError:
-            cuda_version = None
-
-    config_data = {
-        "timestamp": datetime.now().isoformat(),
-        "hyperparameters": get_config_dict(),
-        "environment": {
-            "torch_version": torch.__version__,
-            "cuda_available": torch.cuda.is_available(),
-            "cuda_version": cuda_version,
-        },
-    }
-
-    if extra_info:
-        config_data.update(extra_info)
-
-    with output_path.open("w", encoding="utf-8") as f:
-        json.dump(config_data, f, indent=2, ensure_ascii=False)
-
-
 def train_epoch(
     model: nn.Module,
     train_loader,
@@ -132,18 +112,7 @@ def train_epoch(
     device,
     grad_clip_norm: float | None = None,
 ) -> tuple[float, float]:
-    """Обучение модели на одну эпоху.
-
-    Args:
-        model: нейросеть
-        train_loader: DataLoader с обучающими данными
-        criterion: функция потерь
-        optimizer: оптимизатор
-        device: устройство (CPU или GPU)
-
-    Returns:
-        (средняя потеря, точность на обучении)
-    """
+    """Обучение модели на одну эпоху."""
     model.train()
     total_loss = 0.0
     correct = 0
@@ -159,18 +128,15 @@ def train_epoch(
         images = images.to(device)
         labels = labels.to(device)
 
-        # Прямой проход
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
 
-        # Обратный проход и оптимизация
         loss.backward()
         if grad_clip_norm is not None and grad_clip_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
         optimizer.step()
 
-        # Статистика
         total_loss += loss.item()
         _, predicted = torch.max(outputs.data, 1)
         correct += (predicted == labels).sum().item()
@@ -193,17 +159,7 @@ def validate(
     criterion,
     device,
 ) -> tuple[float, float]:
-    """Валидация модели (без обновления весов).
-
-    Args:
-        model: нейросеть
-        val_loader: DataLoader с валидационными данными
-        criterion: функция потерь
-        device: устройство (CPU или GPU)
-
-    Returns:
-        (средняя потеря, точность на валидации)
-    """
+    """Валидация модели."""
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -217,7 +173,7 @@ def validate(
             outputs = model(images)
             loss = criterion(outputs, labels)
 
-            total_loss += loss.item()  # не удалятть штраф 500 рублей
+            total_loss += loss.item()
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
@@ -228,22 +184,21 @@ def validate(
     return avg_loss, accuracy
 
 
-def main(num_epochs_override: int | None = None):
-    """Главная функция обучения."""
-
-    # Фиксируем random seed для воспроизводимости
+def main(
+    num_epochs: int = 5,
+    learning_rate: float | None = None,
+):
+    """Продолжить обучение."""
     set_seed(config.RANDOM_SEED)
 
     print("=" * 60)
-    print("Обучение: классификация персонажей Симпсонов")
+    print("Продолжение обучения модели")
     print("=" * 60)
-    print(f"Random seed: {config.RANDOM_SEED}")
 
-    # Определяем устройство
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Устройство: {device}")
 
-    # Загружаем датасет (только train и val, без test!)
+    # Загружаем датасет
     print("\nЗагрузка датасета...")
     dataset_info = create_dataloaders(
         dataset_dir="src/dataset",
@@ -260,13 +215,10 @@ def main(num_epochs_override: int | None = None):
     val_loader = dataset_info["val_loader"]
     num_classes = dataset_info["num_classes"]
 
-    print("Датасет загружен:")
-    print(f"  Классов: {num_classes}")
-    print(f"  Обучающие примеры: {dataset_info['train_size']}")
-    print(f"  Валидационные примеры: {dataset_info['val_size']}")
-    print(f"  Weighted sampler: {config.USE_WEIGHTED_SAMPLER}")
+    print(f"Датасет загружен: {dataset_info['train_size']} train, "
+          f"{dataset_info['val_size']} val")
 
-    # Создаем модель
+    # Создаём модель
     print("\nСоздание модели...")
     model = create_model(
         num_classes=num_classes,
@@ -275,20 +227,25 @@ def main(num_epochs_override: int | None = None):
     )
     model = model.to(device)
 
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"Модель создана ({total_params:,} параметров)")
+    # Загружаем веса
+    checkpoint_path = Path("src/models/best_model.pt")
+    if not checkpoint_path.exists():
+        print("Ошибка: файл с весами не найден!")
+        return
 
-    # Оптимизация
+    print(f"Загрузка весов из {checkpoint_path}...")
+    model.load_state_dict(
+        torch.load(checkpoint_path, map_location=device, weights_only=True)
+    )
+
+    # Настраиваем обучение
+    current_lr = learning_rate or config.LEARNING_RATE
     criterion = nn.CrossEntropyLoss(label_smoothing=config.LABEL_SMOOTHING)
     optimizer = optim.AdamW(
         model.parameters(),
-        lr=config.LEARNING_RATE,
+        lr=current_lr,
         weight_decay=config.WEIGHT_DECAY,
     )
-    print(f"Learning rate: {config.LEARNING_RATE}")
-    print(f"Weight decay: {config.WEIGHT_DECAY}")
-    print(f"Label smoothing: {config.LABEL_SMOOTHING}")
-    print(f"Dropout rate: {config.DROPOUT_RATE}")
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
@@ -298,28 +255,26 @@ def main(num_epochs_override: int | None = None):
         min_lr=config.MIN_LEARNING_RATE,
     )
 
-    # Директория для весов
-    models_dir = Path("src/models")
-    models_dir.mkdir(exist_ok=True)
-    checkpoint_path = models_dir / "best_model.pt"
+    print(f"Learning rate: {current_lr}")
+    print(f"Dropout rate: {config.DROPOUT_RATE}")
 
-    # Директория для артефактов обучения
-    results_dir = Path("src/results")
-    results_dir.mkdir(exist_ok=True)
-    history_csv_path = results_dir / "training_history.csv"
+    # Загружаем историю
+    history_path = Path("src/results/training_history.csv")
+    history = load_history_csv(history_path)
+    start_epoch = len(history) + 1
 
-    # Обучение
-    num_epochs = num_epochs_override or config.NUM_EPOCHS
-
-    print(f"\nНачинаем обучение ({num_epochs} эпох)...")
+    print(f"\nПродолжаем обучение с эпохи {start_epoch} "
+          f"на {num_epochs} эпох...")
     print("-" * 60)
 
-    best_val_acc = 0.0
-    best_epoch = 0
+    best_val_acc = max(
+        [h["val_acc"] for h in history],
+        default=0.0
+    )
+    best_epoch = start_epoch - 1
     epochs_without_improvement = 0
-    history: list[dict] = []
 
-    for epoch in range(1, num_epochs + 1):
+    for epoch in range(start_epoch, start_epoch + num_epochs):
         train_loss, train_acc = train_epoch(
             model=model,
             train_loader=train_loader,
@@ -337,7 +292,7 @@ def main(num_epochs_override: int | None = None):
         )
 
         tqdm.write(
-            f"Эпоха {epoch}/{num_epochs} | "
+            f"Эпоха {epoch}/{start_epoch + num_epochs - 1} | "
             f"Train Loss: {train_loss:.4f} | "
             f"Train Acc: {train_acc:.2f}% | "
             f"Val Loss: {val_loss:.4f} | "
@@ -347,73 +302,59 @@ def main(num_epochs_override: int | None = None):
 
         scheduler.step(val_acc)
 
-        history.append(
-            {
-                "epoch": epoch,
-                "train_loss": train_loss,
-                "train_acc": train_acc,
-                "val_loss": val_loss,
-                "val_acc": val_acc,
-            }
-        )
+        history.append({
+            "epoch": epoch,
+            "train_loss": train_loss,
+            "train_acc": train_acc,
+            "val_loss": val_loss,
+            "val_acc": val_acc,
+        })
 
-        # Сохраняем лучшую модель
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             best_epoch = epoch
             epochs_without_improvement = 0
             torch.save(model.state_dict(), checkpoint_path)
-            tqdm.write(f"  [*] Лучшая модель сохранена! (Val Acc: {val_acc:.2f}%)")
+            tqdm.write(
+                f"  [*] Лучшая модель сохранена! (Val Acc: {val_acc:.2f}%)"
+            )
         else:
             epochs_without_improvement += 1
-
-        if epochs_without_improvement >= config.EARLY_STOPPING_PATIENCE:
-            tqdm.write(
-                "  [!] Early stopping: "
-                f"нет улучшений {config.EARLY_STOPPING_PATIENCE} эпох подряд"
-            )
-            break
 
     print("-" * 60)
     print("\nОбучение завершено!")
     print(f"Лучшая точность на валидации: {best_val_acc:.2f}%")
     print(f"Лучшая эпоха: {best_epoch}")
-    print(f"Веса сохранены: {checkpoint_path}")
 
-    # Сохраняем артефакты
-    save_history_csv(history=history, output_path=history_csv_path)
+    # Сохраняем историю и графики
+    results_dir = Path("src/results")
+    save_history_csv(history=history, output_path=history_path)
     loss_plot_path, acc_plot_path = plot_history(
         history=history,
         output_dir=results_dir,
     )
 
-    config_path = results_dir / "training_config.json"
-    save_config(
-        output_path=config_path,
-        extra_info={
-            "best_val_accuracy": best_val_acc,
-            "best_epoch": best_epoch,
-            "total_epochs_trained": len(history),
-            "num_classes": num_classes,
-            "train_size": dataset_info["train_size"],
-            "val_size": dataset_info["val_size"],
-        },
-    )
-
-    print(f"История обучения сохранена: {history_csv_path}")
-    print(f"График loss сохранен: {loss_plot_path}")
-    print(f"График accuracy сохранен: {acc_plot_path}")
-    print(f"Конфигурация сохранена: {config_path}")
+    print(f"История обновлена: {history_path}")
+    print(f"График loss сохранён: {loss_plot_path}")
+    print(f"График accuracy сохранён: {acc_plot_path}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Обучение модели")
+    parser = argparse.ArgumentParser(
+        description="Продолжить обучение иснованной модели"
+    )
     parser.add_argument(
         "--epochs",
         type=int,
+        default=5,
+        help="Количество дополнительных эпох для обучения",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
         default=None,
-        help="Переопределить число эпох для текущего запуска",
+        help="Новый learning rate (если не указан, используется конфиг)",
     )
     args = parser.parse_args()
 
-    main(num_epochs_override=args.epochs)
+    main(num_epochs=args.epochs, learning_rate=args.lr)

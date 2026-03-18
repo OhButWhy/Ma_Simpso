@@ -170,7 +170,8 @@ def main():
     print("\nСоздание модели...")
     model = create_model(
         num_classes=num_classes,
-        input_size=config.INPUT_SIZE
+        input_size=config.INPUT_SIZE,
+        dropout_rate=config.DROPOUT_RATE,
     )
     model = model.to(device)
 

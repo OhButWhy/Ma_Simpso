@@ -14,6 +14,15 @@ NUM_EPOCHS = 15
 VAL_SPLIT = 0.15
 TEST_SPLIT = 0.15
 RANDOM_SEED = 42
+WEIGHT_DECAY = 5e-5
+LABEL_SMOOTHING = 0.0
+USE_WEIGHTED_SAMPLER = False
+DROPOUT_RATE = 0.0
+GRAD_CLIP_NORM = 1.0
+LR_SCHEDULER_PATIENCE = 2
+LR_SCHEDULER_FACTOR = 0.5
+MIN_LEARNING_RATE = 1e-6
+EARLY_STOPPING_PATIENCE = 6
 
 
 def set_seed(seed: int = RANDOM_SEED) -> None:
@@ -42,6 +51,15 @@ def get_config_dict() -> dict:
         "val_split": VAL_SPLIT,
         "test_split": TEST_SPLIT,
         "random_seed": RANDOM_SEED,
+        "weight_decay": WEIGHT_DECAY,
+        "label_smoothing": LABEL_SMOOTHING,
+        "use_weighted_sampler": USE_WEIGHTED_SAMPLER,
+        "dropout_rate": DROPOUT_RATE,
+        "grad_clip_norm": GRAD_CLIP_NORM,
+        "lr_scheduler_patience": LR_SCHEDULER_PATIENCE,
+        "lr_scheduler_factor": LR_SCHEDULER_FACTOR,
+        "min_learning_rate": MIN_LEARNING_RATE,
+        "early_stopping_patience": EARLY_STOPPING_PATIENCE,
     }
 
 
@@ -97,3 +115,37 @@ def apply_config_from_json(config_path: str | Path) -> None:
         setattr(current_module, "VAL_SPLIT", hyperparams["val_split"])
     if "test_split" in hyperparams:
         setattr(current_module, "TEST_SPLIT", hyperparams["test_split"])
+    if "weight_decay" in hyperparams:
+        setattr(current_module, "WEIGHT_DECAY", hyperparams["weight_decay"])
+    if "label_smoothing" in hyperparams:
+        setattr(current_module, "LABEL_SMOOTHING", hyperparams["label_smoothing"])
+    if "use_weighted_sampler" in hyperparams:
+        setattr(
+            current_module,
+            "USE_WEIGHTED_SAMPLER",
+            hyperparams["use_weighted_sampler"],
+        )
+    if "dropout_rate" in hyperparams:
+        setattr(current_module, "DROPOUT_RATE", hyperparams["dropout_rate"])
+    if "grad_clip_norm" in hyperparams:
+        setattr(current_module, "GRAD_CLIP_NORM", hyperparams["grad_clip_norm"])
+    if "lr_scheduler_patience" in hyperparams:
+        setattr(
+            current_module,
+            "LR_SCHEDULER_PATIENCE",
+            hyperparams["lr_scheduler_patience"],
+        )
+    if "lr_scheduler_factor" in hyperparams:
+        setattr(
+            current_module,
+            "LR_SCHEDULER_FACTOR",
+            hyperparams["lr_scheduler_factor"],
+        )
+    if "min_learning_rate" in hyperparams:
+        setattr(current_module, "MIN_LEARNING_RATE", hyperparams["min_learning_rate"])
+    if "early_stopping_patience" in hyperparams:
+        setattr(
+            current_module,
+            "EARLY_STOPPING_PATIENCE",
+            hyperparams["early_stopping_patience"],
+        )

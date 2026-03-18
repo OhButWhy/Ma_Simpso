@@ -12,7 +12,12 @@ class SimpleCNN(nn.Module):
     - Выходной слой для классификации
     """
 
-    def __init__(self, num_classes: int, input_size: int = 128):
+    def __init__(
+        self,
+        num_classes: int,
+        input_size: int = 128,
+        dropout_rate: float = 0.4,
+    ):
         super().__init__()
 
         # Блок 1: 3 -> 64 канала
@@ -33,7 +38,7 @@ class SimpleCNN(nn.Module):
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # Третий MaxPool без дополнительной свертки
+        # Третий MaxPool
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Вычисляем размер после сверток
@@ -44,7 +49,7 @@ class SimpleCNN(nn.Module):
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(feature_size, 256)
         self.relu4 = nn.ReLU()
-        self.dropout = nn.Dropout(0.5)  # Регуляризация: отключаем 50% нейронов
+        self.dropout = nn.Dropout(dropout_rate)
         self.fc2 = nn.Linear(256, num_classes)
 
     def forward(self, x):
@@ -65,23 +70,31 @@ class SimpleCNN(nn.Module):
         x = self.flatten(x)
         x = self.relu4(self.fc1(x))
         x = self.dropout(x)
-        x = self.dropout2(x)
         x = self.fc2(x)
 
         return x
 
 
-def create_model(num_classes: int, input_size: int = 128) -> SimpleCNN:
+def create_model(
+    num_classes: int,
+    input_size: int = 128,
+    dropout_rate: float = 0.4,
+) -> SimpleCNN:
     """Создает и возвращает модель для классификации.
 
     Args:
         num_classes: количество классов для предсказания
         input_size: размер входного изображения (по одной стороне)
+        dropout_rate: вероятность отключения нейронов в Dropout
 
     Returns:
         Инициализированная модель
     """
-    model = SimpleCNN(num_classes=num_classes, input_size=input_size)
+    model = SimpleCNN(
+        num_classes=num_classes,
+        input_size=input_size,
+        dropout_rate=dropout_rate,
+    )
     return model
 
 
